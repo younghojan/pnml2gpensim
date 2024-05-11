@@ -125,15 +125,18 @@ def write_arcs(f, arcs, places, transitions, module, IMCs):
     for arc in arcs:
         source_place = place_map.get(arc["source_id"])
         target_transition = transition_map.get(arc["target_id"])
+        if source_place and target_transition:
+            arc_lines.append(f"'{source_place}', '{target_transition}', 1")
+
+        # Reverse roles for the next check
         source_transition = transition_map.get(arc["target_id"])
         target_place = place_map.get(arc["source_id"])
-
-        if source_place and target_transition:
-            arc_lines.append(f"'{source_place}', '{target_transition}', 1, ...")
-        elif source_transition and target_place:
+        if source_transition and target_place:
             arc_lines.append(f"'{source_transition}', '{target_place}', 1")
+        formatted_arc_lines = ", ...\n\t".join(arc_lines)
 
-    if formatted_arc_lines := ", ...\n\t".join(arc_lines):
+    # Write all formatted arc lines to the file
+    if formatted_arc_lines:
         f.write("pns.set_of_As = {\n\t")
         f.write(formatted_arc_lines)
         f.write("\n\t};\n\n")
@@ -187,6 +190,39 @@ def write_io_ports(f, io_ports, module):
         f.write("\n\t};\n\n")
 
 
+def write_imcs(f, arcs, IMCs, transitions):
+    if IMCs_names := [f"'{IMC['name']}'" for IMC in IMCs if IMC["name"] is not None]:
+        f.write("pns.set_of_Ps = {\n\t")
+        formatted_IMCs_names = ", ...\n\t".join(IMCs_names)
+        f.write(formatted_IMCs_names)
+        f.write("\n\t};\n\n")
+
+        place_map = {IMC["id"]: IMC["name"] for IMC in IMCs}
+        transition_map = {
+            transition["id"]: transition["name"] for transition in transitions
+        }
+
+        arc_lines = []
+        for arc in arcs:
+            source_place = place_map.get(arc["source_id"])
+            target_transition = transition_map.get(arc["target_id"])
+            if source_place and target_transition:
+                arc_lines.append(f"'{source_place}', '{target_transition}', 1")
+
+            # Reverse roles for the next check
+            source_transition = transition_map.get(arc["target_id"])
+            target_place = place_map.get(arc["source_id"])
+            if source_transition and target_place:
+                arc_lines.append(f"'{source_transition}', '{target_place}', 1")
+            formatted_arc_lines = ", ...\n\t".join(arc_lines)
+
+        # Write all formatted arc lines to the file
+        if formatted_arc_lines:
+            f.write("pns.set_of_As = {\n\t")
+            f.write(formatted_arc_lines)
+            f.write("\n\t};\n\n")
+
+
 if __name__ == "__main__":
     root = load_xml("./woped_net.pnml")
     if root is not None:
@@ -210,5 +246,10 @@ if __name__ == "__main__":
 
                 # Write the IO ports
                 write_io_ports(f, IO_ports, module)
+
+        # Write IMC_pdf.m file
+        with open("imc_pdf.m", "w") as f:
+            write_header(f, "imc")
+            write_imcs(f, arcs, IMCs, transitions)
 
     print("Done!")
