@@ -38,21 +38,27 @@ def find_elements_by_tag_and_prefix(root, tag, prefix):
     Returns a list of dictionaries containing element IDs, names,
     and module names if found.
     """
-    elements = []
-    for element in root.findall(f".//{tag}"):
-        name = (
-            element.find(".//text").text
-            if element.find(".//text") is not None
-            else None
-        )
-        module = None
-        if name is not None:
-            for m in MODULE_NAMES:
-                if name.startswith(prefix + m, name.find(prefix)):
-                    module = m
-                    break
-        elements.append({"id": element.get("id"), "name": name, "module": module})
-    return elements
+    return [
+        {
+            "id": element.get("id"),
+            "name": (
+                name := (
+                    element.find(".//text").text
+                    if element.find(".//text") is not None
+                    else None
+                )
+            ),
+            "module": next(
+                (
+                    m
+                    for m in MODULE_NAMES
+                    if name and name.startswith(prefix + m, name.find(prefix))
+                ),
+                None,
+            ),
+        }
+        for element in root.findall(f".//{tag}")
+    ]
 
 
 def find_arcs(root):
@@ -78,84 +84,75 @@ def identify_intermodule_connectors(places, transitions, arcs):
 
     for arc in arcs:
         source, target = arc["source_id"], arc["target_id"]
-        if (
-            source in places_dict
-            and target in transitions_dict
-            and (
-                places_dict[source]["module"]
-                != transitions_dict[target]["module"]
-                != "Collect"
-            )
-        ):
-            IMCs.append(places_dict[source])
-            connected_arcs = [
-                transitions_dict[a["source_id"]]
-                for a in arcs
-                if a["target_id"] == source
-            ]
-            for arc in connected_arcs:
-                if arc not in IO_ports:
-                    IO_ports.append(arc)
+        if source in places_dict and target in transitions_dict:
+            if (
+                places_dict[source]["module"] != transitions_dict[target]["module"]
+                and transitions_dict[target]["module"] != "Collect"
+            ):
+                IMCs.append(places_dict[source])
+                transitions = [
+                    transitions_dict[a["source_id"]]
+                    for a in arcs
+                    if a["target_id"] == source
+                ]
+                for transition in transitions:
+                    if transition not in IO_ports:
+                        IO_ports.append(transition)
 
-            if transitions_dict[target] not in IO_ports:
-                IO_ports.append(transitions_dict[target])
+                if transitions_dict[target] not in IO_ports:
+                    IO_ports.append(transitions_dict[target])
 
     return IMCs, IO_ports
 
 
-def write_arcs(f, arcs, places, transitions, module, IMCs):
+def write_arcs(file, arcs, places, transitions, module, IMCs):
     """
-    Writes the arcs data to the file with specified formatting and conditions, optimized for simplicity and efficiency.
+    Writes the arcs data to the file in a specific format, optimized for simplicity and efficiency.
+    It filters places and transitions by module and excludes places that are named after IMCs.
     """
-    # Pre-compute IMC names and maps for quick lookup
+    # Create sets for quick lookup
     imc_names = {imc["name"] for imc in IMCs}
+
+    # Filter and map places and transitions by module
     place_map = {
-        place["id"]: place["name"]
-        for place in places
-        if place["module"] == module and place["name"] not in imc_names
+        p["id"]: p["name"]
+        for p in places
+        if p["module"] == module and p["name"] not in imc_names
     }
-    transition_map = {
-        transition["id"]: transition["name"]
-        for transition in transitions
-        if transition["module"] == module
-    }
+    transition_map = {t["id"]: t["name"] for t in transitions if t["module"] == module}
 
-    # Generate formatted arc lines
-    arc_lines = []
+    # Collect formatted arc lines using a set to avoid duplicates
+    arc_lines = set()
     for arc in arcs:
-        source_place = place_map.get(arc["source_id"])
-        target_transition = transition_map.get(arc["target_id"])
-        if source_place and target_transition:
-            arc_lines.append(f"'{source_place}', '{target_transition}', 1")
+        source = place_map.get(arc["source_id"])
+        target = transition_map.get(arc["target_id"])
+        if source and target:
+            arc_lines.add(f"'{source}', '{target}', 1")
 
-        # Reverse roles for the next check
+        # Check reverse roles and conditional arcs within the same module
         source_transition = transition_map.get(arc["target_id"])
-        target_place = place_map.get(arc["source_id"])
-        if source_transition and target_place:
-            arc_lines.append(f"'{source_transition}', '{target_place}', 1")
-        formatted_arc_lines = ", ...\n\t".join(arc_lines)
+        target_place_ids = {
+            a["target_id"] for a in arcs if a["source_id"] == arc["target_id"]
+        }
 
-    # Write all formatted arc lines to the file
-    if formatted_arc_lines:
-        f.write("pns.set_of_As = {\n\t")
-        f.write(formatted_arc_lines)
-        f.write("\n\t};\n\n")
+        for target_id in target_place_ids:
+            if target_id in place_map and target_id != arc["source_id"]:
+                arc_lines.add(f"'{source_transition}', '{place_map[target_id]}', 1")
 
-
-def write_names(f, names, set_name):
-    if names:
-        f.write(f"pns.{set_name} = {{\n\t")
-        formatted_names = ", ...\n\t".join(names)
-        f.write(formatted_names)
-        f.write("\n\t};\n\n")
+    # Convert set to sorted list for consistent order, then format for writing
+    if arc_lines:
+        formatted_arc_lines = ", ...\n\t".join(sorted(list(arc_lines)))
+        file.write(f"pns.set_of_As = {{\n\t{formatted_arc_lines}\n\t}};\n\n")
 
 
 def write_places_and_transitions(f, places, transitions, module, IMCs):
     """
     Writes the places and transitions data to the file with specified formatting and conditions.
     """
+    # Pre-compute IMC names for quick lookup
     imc_names = {imc["name"] for imc in IMCs}
 
+    # Generate formatted names list of places and transitions meeting the conditions
     places_names = [
         f"'{place['name']}'"
         for place in places
@@ -169,8 +166,19 @@ def write_places_and_transitions(f, places, transitions, module, IMCs):
         if transition["name"] is not None and transition["module"] == module
     ]
 
-    write_names(f, places_names, "set_of_Ps")
-    write_names(f, transitions_names, "set_of_Ts")
+    # Write to file if there are any eligible places
+    if places_names:
+        f.write("pns.set_of_Ps = {\n\t")
+        formatted_places_names = ", ...\n\t".join(places_names)
+        f.write(formatted_places_names)
+        f.write("\n\t};\n\n")
+
+    # Write to file if there are any eligible transitions
+    if transitions_names:
+        f.write("pns.set_of_Ts = {\n\t")
+        formatted_transitions_names = ", ...\n\t".join(transitions_names)
+        f.write(formatted_transitions_names)
+        f.write("\n\t};\n\n")
 
 
 def write_header(f, module):
@@ -179,11 +187,12 @@ def write_header(f, module):
 
 
 def write_io_ports(f, io_ports, module):
-    if io_ports_names := [
+    io_ports_names = [
         f"'{io_port['name']}'"
         for io_port in io_ports
         if io_port["name"] is not None and io_port["module"] == module
-    ]:
+    ]
+    if io_ports_names:
         f.write("pns.set_of_ports = {\n\t")
         formatted_io_ports_names = ", ...\n\t".join(io_ports_names)
         f.write(formatted_io_ports_names)
@@ -202,25 +211,27 @@ def write_imcs(f, arcs, IMCs, transitions):
             transition["id"]: transition["name"] for transition in transitions
         }
 
-        arc_lines = []
+        arc_lines = set()
         for arc in arcs:
-            source_place = place_map.get(arc["source_id"])
-            target_transition = transition_map.get(arc["target_id"])
-            if source_place and target_transition:
-                arc_lines.append(f"'{source_place}', '{target_transition}', 1")
+            source = place_map.get(arc["source_id"])
+            target = transition_map.get(arc["target_id"])
+            if source and target:
+                arc_lines.add(f"'{source}', '{target}', 1")
 
-            # Reverse roles for the next check
+            # Check reverse roles and conditional arcs within the same module
             source_transition = transition_map.get(arc["target_id"])
-            target_place = place_map.get(arc["source_id"])
-            if source_transition and target_place:
-                arc_lines.append(f"'{source_transition}', '{target_place}', 1")
-            formatted_arc_lines = ", ...\n\t".join(arc_lines)
+            target_place_ids = {
+                a["target_id"] for a in arcs if a["source_id"] == arc["target_id"]
+            }
 
-        # Write all formatted arc lines to the file
-        if formatted_arc_lines:
-            f.write("pns.set_of_As = {\n\t")
-            f.write(formatted_arc_lines)
-            f.write("\n\t};\n\n")
+            for target_id in target_place_ids:
+                if target_id in place_map and target_id != arc["source_id"]:
+                    arc_lines.add(f"'{source_transition}', '{place_map[target_id]}', 1")
+
+        # Convert set to sorted list for consistent order, then format for writing
+        if arc_lines:
+            formatted_arc_lines = ", ...\n\t".join(sorted(list(arc_lines)))
+            f.write(f"pns.set_of_As = {{\n\t{formatted_arc_lines}\n\t}};\n\n")
 
 
 if __name__ == "__main__":
