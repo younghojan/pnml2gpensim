@@ -142,7 +142,7 @@ def write_arcs(file, arcs, places, transitions, module, IMCs):
     # Convert set to sorted list for consistent order, then format for writing
     if arc_lines:
         formatted_arc_lines = ", ...\n\t".join(sorted(list(arc_lines)))
-        file.write(f"pns.set_of_As = {{\n\t{formatted_arc_lines}\n\t}};\n\n")
+        file.write(f"png.set_of_As = {{\n\t{formatted_arc_lines}\n\t}};\n\n")
 
 
 def write_places_and_transitions(f, places, transitions, module, IMCs):
@@ -168,22 +168,22 @@ def write_places_and_transitions(f, places, transitions, module, IMCs):
 
     # Write to file if there are any eligible places
     if places_names:
-        f.write("pns.set_of_Ps = {\n\t")
+        f.write("png.set_of_Ps = {\n\t")
         formatted_places_names = ", ...\n\t".join(places_names)
         f.write(formatted_places_names)
         f.write("\n\t};\n\n")
 
     # Write to file if there are any eligible transitions
     if transitions_names:
-        f.write("pns.set_of_Ts = {\n\t")
+        f.write("png.set_of_Ts = {\n\t")
         formatted_transitions_names = ", ...\n\t".join(transitions_names)
         f.write(formatted_transitions_names)
         f.write("\n\t};\n\n")
 
 
 def write_header(f, module):
-    f.write(f"function [pns] = {module.lower()}_pdf()\n\n")
-    f.write(f"pns.PN_name = '{module}';\n\n")
+    f.write(f"function [png] = {module.lower()}_pdf()\n\n")
+    f.write(f"png.PN_name = '{module.lower()}';\n\n")
 
 
 def write_io_ports(f, io_ports, module):
@@ -193,7 +193,7 @@ def write_io_ports(f, io_ports, module):
         if io_port["name"] is not None and io_port["module"] == module
     ]
     if io_ports_names:
-        f.write("pns.set_of_ports = {\n\t")
+        f.write("png.set_of_Ports = {\n\t")
         formatted_io_ports_names = ", ...\n\t".join(io_ports_names)
         f.write(formatted_io_ports_names)
         f.write("\n\t};\n\n")
@@ -201,7 +201,7 @@ def write_io_ports(f, io_ports, module):
 
 def write_imcs(f, arcs, IMCs, transitions):
     if IMCs_names := [f"'{IMC['name']}'" for IMC in IMCs if IMC["name"] is not None]:
-        f.write("pns.set_of_Ps = {\n\t")
+        f.write("png.set_of_Ps = {\n\t")
         formatted_IMCs_names = ", ...\n\t".join(IMCs_names)
         f.write(formatted_IMCs_names)
         f.write("\n\t};\n\n")
@@ -231,7 +231,7 @@ def write_imcs(f, arcs, IMCs, transitions):
         # Convert set to sorted list for consistent order, then format for writing
         if arc_lines:
             formatted_arc_lines = ", ...\n\t".join(sorted(list(arc_lines)))
-            f.write(f"pns.set_of_As = {{\n\t{formatted_arc_lines}\n\t}};\n\n")
+            f.write(f"png.set_of_As = {{\n\t{formatted_arc_lines}\n\t}};\n\n")
 
 
 if __name__ == "__main__":

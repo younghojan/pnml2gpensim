@@ -1,8 +1,8 @@
-function [pns] = collect_pdf()
+function [png] = collect_pdf()
 
-pns.PN_name = 'Collect';
+png.PN_name = 'collect';
 
-pns.set_of_Ts = {
+png.set_of_Ts = {
 	'tCollect'
 	};
 

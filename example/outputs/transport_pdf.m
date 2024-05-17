@@ -1,28 +1,30 @@
-function [pns] = transport_pdf()
+function [png] = transport_pdf()
 
-pns.PN_name = 'Transport';
+png.PN_name = 'transport';
 
-pns.set_of_Ps = {
+png.set_of_Ps = {
+	'pTransportEnd', ...
 	'pTransportOutBoundCTNReceived', ...
 	'pTransportCTNSent'
 	};
 
-pns.set_of_Ts = {
+png.set_of_Ts = {
 	'tTransportGetOutboundCTN', ...
 	'tTransportSendCTN', ...
 	'tTransportSendOutboundCTN'
 	};
 
-pns.set_of_As = {
+png.set_of_As = {
 	'pTransportCTNSent', 'tTransportGetOutboundCTN', 1, ...
-	'tTransportGetOutboundCTN', 'pTransportCTNSent', 1, ...
 	'pTransportOutBoundCTNReceived', 'tTransportSendOutboundCTN', 1, ...
-	'tTransportSendOutboundCTN', 'pTransportOutBoundCTNReceived', 1
+	'tTransportGetOutboundCTN', 'pTransportOutBoundCTNReceived', 1, ...
+	'tTransportSendCTN', 'pTransportCTNSent', 1, ...
+	'tTransportSendOutboundCTN', 'pTransportEnd', 1
 	};
 
-pns.set_of_ports = {
-	'tTransportSendOutboundCTN', ...
+png.set_of_Ports = {
 	'tTransportSendCTN', ...
-	'tTransportGetOutboundCTN'
+	'tTransportGetOutboundCTN', ...
+	'tTransportSendOutboundCTN'
 	};
 

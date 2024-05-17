@@ -1,16 +1,20 @@
-function [pns] = sbgs_pdf()
+function [png] = sbgs_pdf()
 
-pns.PN_name = 'SBGS';
+png.PN_name = 'sbgs';
 
-pns.set_of_Ps = {
+png.set_of_Ps = {
 	'pSBGSEnd'
 	};
 
-pns.set_of_Ts = {
+png.set_of_Ts = {
 	'tSBGSRegistration'
 	};
 
-pns.set_of_ports = {
+png.set_of_As = {
+	'tSBGSRegistration', 'pSBGSEnd', 1
+	};
+
+png.set_of_Ports = {
 	'tSBGSRegistration'
 	};
 
